@@ -1,0 +1,19 @@
+"""
+Created on Tue May  31 16:38:07 2018
+
+Script to rename imagery with UTC time/date format
+
+@author: jlogan
+"""
+
+from PIL import Image
+from PIL.ExifTags import TAGS
+
+def get_exif(fn):
+    ret = {}
+    i = Image.open(fn)
+    info = i._getexif()
+    for tag, value in info.items():
+        decoded = TAGS.get(tag, tag)
+        ret[decoded] = value
+    return ret
