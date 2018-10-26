@@ -1,12 +1,15 @@
 """
 Created on Tue May  31 16:38:07 2018
 
-Script to rename imagery with UTC time/date format
+Script to rename imagery with flight prefix and UTC time/date from EXIF
 
+exampled: runfile('renameUASimages.py', args='-dir=D:/temp/testrename -f=2 -utc=0 -sepdir')
 @author: jlogan
 """
 import argparse
+import sys
 from pathlib import Path
+import shutil
 from tqdm import tqdm
 from datetime import datetime, timedelta
 import exifread
@@ -97,4 +100,17 @@ if user_prompt('Do you want to rename this and all images in this directory foll
         #loop through files
         for fn in tqdm(indir.glob('*.' + ftype)):
             fn.rename(Path(fn.parent, Path(new_image_name(fn, utcoffset, fltnum))))
+else:
+    print('Terminating script.')
+    sys.exit()
+                
+            
+#move to separate directories if specified
+if sepdir:
+    for ftype in ftypes:
+        newdir = Path(indir, ftype.lower())
+        newdir.mkdir()
+        for fn in indir.glob('*.' + ftype):
+            shutil.move(fn, Path(newdir, fn.name))
+        
     
