@@ -105,8 +105,8 @@ londf['diff_deg'] = londf['max']-londf['min']
 londf['diff_m'] = londf['diff_deg'] * np.cos(np.deg2rad(londf['max']))
 
 #join to compute dist
-
-
+lldf = pd.merge(latdf, londf, on='dt', how='outer')
+lldf['maxdist_m'] = np.sqrt(np.square(lldf['diff_m_x']) + np.square(lldf['diff_m_y']))
 
 
     
