@@ -21,6 +21,7 @@ import exifread
 import numpy as np
 from lxml import etree
 import pandas as pd
+import utm
 
 
 gpxdirstr = 'T:/UAS/2018-676-FA/tlogs/yellow/aircraft/gpx'
@@ -40,6 +41,14 @@ def get_dt_orignal(fn):
         tags = exifread.process_file(i)
     dt_orig = str(tags.get('EXIF DateTimeOriginal'))
     return dt_orig
+
+def getUTMs(row):
+    '''Get UTM coords from lat,lon using utm library.
+       from: https://stackoverflow.com/questions/30014684/pandas-apply-utm-function-to-dataframe-columns
+    '''
+    tup = utm.from_latlon(row['lat'], row['lon'])
+    return pd.Series(tup[:2])
+
 
 def nearest(items, pivot):
     #from: https://stackoverflow.com/questions/32237862/find-the-closest-date-to-a-given-date
@@ -93,16 +102,23 @@ gpxdf['dt'] = pd.to_datetime(gpxdf['time'], format='%Y-%m-%dT%H:%M:%S')
 gpxdf.drop(columns=['time'])
 
 #gpx files have > 1 row per second (duplicate time stamps).  
-#ensure that duplicates are close together spatially, then calc mean lat/long/elev for each
+#project lat/lon to utm to determine how close points with duplicate time stamp are in meters
+gpxdf[['easting','northing']] = gpxdf.apply(getUTMs , axis=1)
+
+#ensure that duplicates are close together spatially, 
+
+
+
+then calc mean lat/long/elev for each
 latdf = gpxdf.groupby('dt')['lat'].agg(['max','min'])
-latdf['diff_deg'] = latdf['max']-latdf['min']
+latdf['diff_deg'] = np.abs(latdf['max']-latdf['min'])
 #calc approx. dist. in meters (from http://www.esri.com/news/arcuser/0400/wdside.html)
 latdf['diff_m'] = latdf['diff_deg'] * 30.87
 
 londf = gpxdf.groupby('dt')['lon'].agg(['max','min'])
-londf['diff_deg'] = londf['max']-londf['min']
+londf['diff_deg'] = np.abs(londf['max']-londf['min'])
 #calc approx. dist. in meters
-londf['diff_m'] = londf['diff_deg'] * np.cos(np.deg2rad(londf['max']))
+londf['diff_m'] = londf['diff_deg'] * 30.87 * np.cos(np.deg2rad(londf['max']))
 
 #join to compute dist
 lldf = pd.merge(latdf, londf, on='dt', how='outer')
