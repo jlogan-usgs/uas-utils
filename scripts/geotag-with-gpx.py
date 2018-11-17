@@ -42,12 +42,27 @@ def get_dt_orignal(fn):
     dt_orig = str(tags.get('EXIF DateTimeOriginal'))
     return dt_orig
 
-def getUTMs(row):
-    '''Get UTM coords from lat,lon using utm library.
-       from: https://stackoverflow.com/questions/30014684/pandas-apply-utm-function-to-dataframe-columns
+def m_per_deg_lat(latdeg):
+    '''Calculates meters per degree of latitude at latdeg
+       from: https://en.wikipedia.org/wiki/Geographic_coordinate_system#Expressing_latitude_and_longitude_as_linear_units
     '''
-    tup = utm.from_latlon(row['lat'], row['lon'])
-    return pd.Series(tup[:2])
+    m_at_lat = 111132.954 - 559.822 * np.cos(np.deg2rad(2.0 * latdeg)) + 1.175 * np.cos(np.deg2rad(4.0 * latdeg)) - 0.0023 * np.cos(np.deg2rad(6.0 * latdeg))
+    return m_at_lat
+
+def m_per_deg_lon(latdeg):
+    '''Calculates meters per degree of longitude at latdeg
+       from: https://en.wikipedia.org/wiki/Geographic_coordinate_system#Expressing_latitude_and_longitude_as_linear_units
+    '''
+    m_at_lon = 111412.84 * np.cos(np.deg2rad(latdeg)) - 93.5 * np.cos(np.deg2rad(3.0 * latdeg)) + 0.118 * np.cos(np.deg2rad(5.0 * latdeg))
+    return m_at_lon   
+
+
+#def getUTMs(row):
+#    '''Get UTM coords from lat,lon using utm library.
+#       from: https://stackoverflow.com/questions/30014684/pandas-apply-utm-function-to-dataframe-columns
+#    '''
+#    tup = utm.from_latlon(row['lat'], row['lon'])
+#    return pd.Series(tup[:2])
 
 
 def nearest(items, pivot):
@@ -102,27 +117,24 @@ gpxdf['dt'] = pd.to_datetime(gpxdf['time'], format='%Y-%m-%dT%H:%M:%S')
 gpxdf.drop(columns=['time'])
 
 #gpx files have > 1 row per second (duplicate time stamps).  
-#project lat/lon to utm to determine how close points with duplicate time stamp are in meters
-gpxdf[['easting','northing']] = gpxdf.apply(getUTMs , axis=1)
+##project lat/lon to utm to determine how close points with duplicate time stamp are in meters
+#gpxdf[['easting','northing']] = gpxdf.apply(getUTMs , axis=1)
 
 #ensure that duplicates are close together spatially, 
-
-
-
-then calc mean lat/long/elev for each
+#then calc mean lat/long/elev for each
 latdf = gpxdf.groupby('dt')['lat'].agg(['max','min'])
 latdf['diff_deg'] = np.abs(latdf['max']-latdf['min'])
-#calc approx. dist. in meters (from http://www.esri.com/news/arcuser/0400/wdside.html)
-latdf['diff_m'] = latdf['diff_deg'] * 30.87
+#calc approx. dist. in meters 
+latdf['diff_m'] = latdf['diff_deg'] * m_per_deg_lat(latdf['max'])
 
 londf = gpxdf.groupby('dt')['lon'].agg(['max','min'])
 londf['diff_deg'] = np.abs(londf['max']-londf['min'])
 #calc approx. dist. in meters
-londf['diff_m'] = londf['diff_deg'] * 30.87 * np.cos(np.deg2rad(londf['max']))
+londf['diff_m'] = londf['diff_deg'] * m_per_deg_lon(londf['max'])
 
-#join to compute dist
-lldf = pd.merge(latdf, londf, on='dt', how='outer')
-lldf['maxdist_m'] = np.sqrt(np.square(lldf['diff_m_x']) + np.square(lldf['diff_m_y']))
+##join to compute dist
+#lldf = pd.merge(latdf, londf, on='dt', how='outer')
+#lldf['maxdist_m'] = np.sqrt(np.square(lldf['diff_m_x']) + np.square(lldf['diff_m_y']))
 
 
     
