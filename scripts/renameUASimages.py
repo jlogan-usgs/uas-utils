@@ -31,7 +31,7 @@ def new_image_name(img, utcoffset, fltnum):
     #PIL doesn't work for DNG
     #imgdt = datetime.strptime(Image.open(img)._getexif()[36867], '%Y:%m:%d %H:%M:%S')  
     #using exifread instead
-    imgdt = datetime.strptime(get_dt_orignal(img), '%Y:%m:%d %H:%M:%S')
+    imgdt = datetime.strptime(get_dt_original(img), '%Y:%m:%d %H:%M:%S')
     #add UTC offset to get UTC time
     imgutcdt = imgdt + timedelta(hours=utcoffset)
     #format output utc dt, using ISO 8601 format
