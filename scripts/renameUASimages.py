@@ -3,7 +3,7 @@ Created on Tue May  31 16:38:07 2018
 
 Script to rename imagery with flight prefix and UTC time/date from EXIF
 
-exampled: runfile('renameUASimages.py', args='-dir=D:/temp/testrename -f=2 -utc=0 -sepdir')
+example: runfile('renameUASimages.py', args='-dir=D:/temp/testrename -f=2 -utc=0 -sepdir')
 @author: jlogan
 """
 import argparse
@@ -18,7 +18,7 @@ import exifread
 ftypes = ['JPG', 'DNG']
 
 #using exifread which works for DNG and JPG
-def get_dt_orignal(fn):
+def get_dt_original(fn):
     '''Gets DateTimeOriginal value from EXIF'''
     with open(fn, 'rb') as i:
         tags = exifread.process_file(i)
@@ -90,7 +90,7 @@ utcoffset = args.utcoffset
 ftype = ftypes[0]
 fsample = next(indir.glob('*.' + ftype))
 print('Image ' + fsample.name + ' has time stamp: ' + 
-      str(datetime.strptime(get_dt_orignal(fsample), '%Y:%m:%d %H:%M:%S')) +
+      str(datetime.strptime(get_dt_original(fsample), '%Y:%m:%d %H:%M:%S')) +
       '\n' + 'Image ' + fsample.name + ' will be renamed to: ' + 
       new_image_name(fsample, utcoffset, fltnum)+ '\n')
 
