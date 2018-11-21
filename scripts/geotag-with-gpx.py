@@ -34,6 +34,9 @@ imgdir = Path(imgdirstr)
 #file types to geotag
 ftypes = ['JPG', 'DNG']
 
+#cutoff to determine if there are overlapping gpx files in gpx batch
+max_gps_err_per_sec_meters = 25
+
 #using exifread which works for DNG and JPG
 def get_dt_orignal(fn):
     '''Gets DateTimeOriginal value from EXIF'''
@@ -132,9 +135,10 @@ londf['diff_deg'] = np.abs(londf['max']-londf['min'])
 #calc approx. dist. in meters
 londf['diff_m'] = londf['diff_deg'] * m_per_deg_lon(londf['max'])
 
-##join to compute dist
-#lldf = pd.merge(latdf, londf, on='dt', how='outer')
-#lldf['maxdist_m'] = np.sqrt(np.square(lldf['diff_m_x']) + np.square(lldf['diff_m_y']))
-
+#ensure that neither lat or lon change more than 'max_gps_err_per_sec_meters' in each 
+#second.  If they do, this indicates that there may be overlapping gpx files (from two GPS units?)
+if any(i >= max_gps_err_per_sec_meters for i in [latdf.diff_m.abs().max(), londf.diff_m.abs().max()]):
+    raise ValueError(f'Coordinates in gpx files varried by more than {max_gps_err_per_sec_meters} meters within one second interval. Possible overlapping gpx files. Stopping execution.')
+    
 
     
