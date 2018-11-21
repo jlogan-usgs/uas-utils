@@ -25,20 +25,17 @@ import utm
 
 
 gpxdirstr = 'T:/UAS/2018-676-FA/tlogs/yellow/aircraft/gpx'
-imgdirstr = 'D:/temp/testrename'
+imgdirstr = 'D:/temp/testrename/jpg'
 
 gpxdir = Path(gpxdirstr)
 imgdir = Path(imgdirstr)
 
-
-#file types to geotag
-ftypes = ['JPG', 'DNG']
-
-#cutoff to determine if there are overlapping gpx files in gpx batch
-max_gps_err_per_sec_meters = 25
+ftypes = ['JPG', 'DNG']  #file types to geotag
+max_gps_err_per_sec_meters = 25 #cutoff to determine if there are overlapping gpx files in gpx batch
+max_time_offset = 10 #max acceptable difference between GPX time and image time
 
 #using exifread which works for DNG and JPG
-def get_dt_orignal(fn):
+def get_dt_original(fn):
     '''Gets DateTimeOriginal value from EXIF'''
     with open(fn, 'rb') as i:
         tags = exifread.process_file(i)
@@ -73,6 +70,7 @@ def nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
 def nearest_ind(items, pivot):
+    #from: https://stackoverflow.com/questions/32237862/find-the-closest-date-to-a-given-date
     time_diff = np.abs([date - pivot for date in items])
     return time_diff.argmin(0)
 
@@ -140,5 +138,22 @@ londf['diff_m'] = londf['diff_deg'] * m_per_deg_lon(londf['max'])
 if any(i >= max_gps_err_per_sec_meters for i in [latdf.diff_m.abs().max(), londf.diff_m.abs().max()]):
     raise ValueError(f'Coordinates in gpx files varried by more than {max_gps_err_per_sec_meters} meters within one second interval. Possible overlapping gpx files. Stopping execution.')
     
+# if all good, groupby dt and derive mean coordinates into new 1 Hz df
+gpx1hzdf = gpxdf.groupby('dt', as_index=False).mean()
 
+#loop through ftypes
+for ftype in ftypes:
+#loop through files
+    #for fn in tqdm(imgdir.glob('*.' + ftype)):
+    for fn in imgdir.glob('*.' + ftype):
+        #Load image datetime from exif
+        imgdt = datetime.strptime(get_dt_original(fn), '%Y:%m:%d %H:%M:%S')
+        #find nearest dt stamp in gpx1hzdf
+        idx = nearest_ind(gpx1hzdf['dt'], imgdt)
+        gpxtime = gpx1hzdf.loc[idx]['dt'].to_pydatetime()
+        gpxlat = gpx1hzdf.loc[idx]['lat']
+        gpxlon = gpx1hzdf.loc[idx]['lon']
+        gpxele = gpx1hzdf.loc[idx]['ele']
+        #check if exceeds max time offset
+        
     
