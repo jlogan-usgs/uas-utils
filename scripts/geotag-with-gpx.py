@@ -34,6 +34,8 @@ ftypes = ['JPG', 'DNG']  #file types to geotag
 max_gps_err_per_sec_meters = 25 #cutoff to determine if there are overlapping gpx files in gpx batch
 max_time_offset = 10 #max acceptable difference between GPX time and image time
 
+cam_to_utc_adjust_sec = 0 #Number of seconds (+-) to adjust camera time to get to accurate UTC time
+
 #using exifread which works for DNG and JPG
 def get_dt_original(fn):
     '''Gets DateTimeOriginal value from EXIF'''
@@ -136,7 +138,7 @@ londf['diff_m'] = londf['diff_deg'] * m_per_deg_lon(londf['max'])
 #ensure that neither lat or lon change more than 'max_gps_err_per_sec_meters' in each 
 #second.  If they do, this indicates that there may be overlapping gpx files (from two GPS units?)
 if any(i >= max_gps_err_per_sec_meters for i in [latdf.diff_m.abs().max(), londf.diff_m.abs().max()]):
-    raise ValueError(f'Coordinates in gpx files varried by more than {max_gps_err_per_sec_meters} meters within one second interval. Possible overlapping gpx files. Stopping execution.')
+    raise ValueError(f'Coordinates in gpx files varied by more than {max_gps_err_per_sec_meters} meters within one second interval. Possible overlapping gpx files. Stopping execution.')
     
 # if all good, groupby dt and derive mean coordinates into new 1 Hz df
 gpx1hzdf = gpxdf.groupby('dt', as_index=False).mean()
@@ -148,6 +150,10 @@ for ftype in ftypes:
     for fn in imgdir.glob('*.' + ftype):
         #Load image datetime from exif
         imgdt = datetime.strptime(get_dt_original(fn), '%Y:%m:%d %H:%M:%S')
+        
+        #adjust image time
+        imgdt + timedelta(seconds=cam_to_utc_adjust_sec)
+                          
         #find nearest dt stamp in gpx1hzdf
         idx = nearest_ind(gpx1hzdf['dt'], imgdt)
         gpxtime = gpx1hzdf.loc[idx]['dt'].to_pydatetime()
@@ -155,5 +161,11 @@ for ftype in ftypes:
         gpxlon = gpx1hzdf.loc[idx]['lon']
         gpxele = gpx1hzdf.loc[idx]['ele']
         #check if exceeds max time offset
-        
+        abs_actual_offset = np.abs((imgdt - gpxtime).total_seconds())
+        if abs_actual_offset > max_time_offset:
+            print(f'No GPS data found within {max_time_offset} seconds of adjusted image time for image {fn}, skipping geotag operation.')
+        else:
+            
+                
+            
     
