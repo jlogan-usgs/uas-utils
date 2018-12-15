@@ -23,6 +23,9 @@ from lxml import etree
 import pandas as pd
 import utm
 
+PYEXIFTOOLPATH = r'D:/jloganPython/pyexiftool'
+#append path with pyexiftool
+sys.path.append(PYEXIFTOOLPATH)
 
 gpxdirstr = 'T:/UAS/2018-676-FA/tlogs/yellow/aircraft/gpx'
 imgdirstr = 'D:/temp/testrename/jpg'
@@ -143,19 +146,22 @@ if any(i >= max_gps_err_per_sec_meters for i in [latdf.diff_m.abs().max(), londf
 # if all good, groupby dt and derive mean coordinates into new 1 Hz df
 gpx1hzdf = gpxdf.groupby('dt', as_index=False).mean()
 
+#instatiate new dataframe to hold image name, lat, long, etc
+geotagdf = pd.DataFrame(columns=['imagepath','imagename','imagedt', 'imagedt_adj','gpxtime','timediff','gpxlat','gpxlon','gpxele', 'gpxheading','gpxroll','gpxpitch'])
+
 #loop through ftypes
 for ftype in ftypes:
-#loop through files
+#loop through files and write data to pandas df
     #for fn in tqdm(imgdir.glob('*.' + ftype)):
     for fn in imgdir.glob('*.' + ftype):
         #Load image datetime from exif
         imgdt = datetime.strptime(get_dt_original(fn), '%Y:%m:%d %H:%M:%S')
         
         #adjust image time
-        imgdt + timedelta(seconds=cam_to_utc_adjust_sec)
+        adjimgdt = imgdt + timedelta(seconds=cam_to_utc_adjust_sec)
                           
         #find nearest dt stamp in gpx1hzdf
-        idx = nearest_ind(gpx1hzdf['dt'], imgdt)
+        idx = nearest_ind(gpx1hzdf['dt'], adjimgdt)
         gpxtime = gpx1hzdf.loc[idx]['dt'].to_pydatetime()
         gpxlat = gpx1hzdf.loc[idx]['lat']
         gpxlon = gpx1hzdf.loc[idx]['lon']
@@ -164,7 +170,39 @@ for ftype in ftypes:
         abs_actual_offset = np.abs((imgdt - gpxtime).total_seconds())
         if abs_actual_offset > max_time_offset:
             print(f'No GPS data found within {max_time_offset} seconds of adjusted image time for image {fn}, skipping geotag operation.')
+            geotagdf = geotagdf.append({
+                    'imagepath': fn,
+                    'imagename': fn,
+                    'imagedt': imgdt,
+                    'imagedt_adj' : adjimgdt,
+                    'gpxtime': gpxtime,
+                    'timediff': abs_actual_offset,
+                    'gpxlat': np.NaN,
+                    'gpxlon': np.NaN,
+                    'gpxele': np.NaN,
+                    'gpxheading': np.NaN,
+                    'gpxroll': np.NaN,
+                    'gpxpitch': np.NaN,
+                    }, ignore_index=True)
         else:
+            geotagdf = geotagdf.append({
+                    'imagepath': fn,
+                    'imagename': fn,
+                    'imagedt': imgdt,
+                    'imagedt_adj' : adjimgdt,
+                    'gpxtime': gpxtime,
+                    'timediff': abs_actual_offset,
+                    'gpxlat': gpx1hzdf.loc[idx]['lat'],
+                    'gpxlon': gpx1hzdf.loc[idx]['lon'],
+                    'gpxele': gpx1hzdf.loc[idx]['ele'],
+                    'gpxheading': gpx1hzdf.loc[idx]['course'],
+                    'gpxroll': gpx1hzdf.loc[idx]['roll'],
+                    'gpxpitch': gpx1hzdf.loc[idx]['pitch'],
+                    }, ignore_index=True)
+
+#Loop through df and run exiftool
+
+    #using pyexiftool?
             
                 
             
