@@ -12,10 +12,7 @@ example: runfile('geotag-with-gpx.py', args='-dir=D:/temp/testrename -f=2 -utc=0
 
 
 import argparse
-
 from pathlib import Path
-
-from tqdm import tqdm
 from datetime import datetime, timedelta
 import exifread
 import numpy as np
@@ -24,17 +21,11 @@ import pandas as pd
 import subprocess
 
 
-#PYEXIFTOOLPATH = r'D:/jloganPython/pyexiftool'
-#EXIFTOOLPATH = r'D:/soft/exiftool-10.49/exiftool.exe'
-##append path with pyexiftool
-#sys.path.append(PYEXIFTOOLPATH)
-#import exiftool
-
 EXIFTOOLPATH = r'D:/soft/exiftool-10.49/exiftool.exe'
 
 gpxdirstr = 'T:/UAS/2018-676-FA/tlogs/yellow/aircraft/gpx'
-imgdirstr = 'D:/temp/testrename'
-geotagcsv = 'geotag.csv'
+imgdirstr = 'D:/temp/test_geotag'
+geotagfn = 'geotag'
 
 gpxdir = Path(gpxdirstr)
 imgdir = Path(imgdirstr)
@@ -118,10 +109,6 @@ for fn in gpxdir.glob('*.gpx'):
 gpxdf['dt'] = pd.to_datetime(gpxdf['time'], format='%Y-%m-%dT%H:%M:%S')
 gpxdf.drop(columns=['time'])
 
-#gpx files have > 1 row per second (duplicate time stamps).  
-##project lat/lon to utm to determine how close points with duplicate time stamp are in meters
-#gpxdf[['easting','northing']] = gpxdf.apply(getUTMs , axis=1)
-
 #ensure that duplicates are close together spatially, 
 #then calc mean lat/long/elev for each
 latdf = gpxdf.groupby('dt')['lat'].agg(['max','min'])
@@ -196,11 +183,12 @@ for ftype in ftypes:
                     'GPSPitch': gpx1hzdf.loc[idx]['pitch'],
                     }, ignore_index=True)
 
-#Export to geotag csv
-geotagdf.to_csv(imgdir.joinpath('geotag.csv'), index=False)
-csvfnstr= imgdir.joinpath('geotag.csv').as_posix()
+#Export to geotag csv 
+geotagdf.to_csv(imgdir.joinpath(f'{str(imgdir.name)}_{geotagfn}.csv'), index=False)
+csvfnstr = imgdir.joinpath(f'{str(imgdir.name)}_{geotagfn}.csv').as_posix()
 
 #run exiftool using subprocess
+print(f'running exiftool command: {EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}')
 subprocess.run(f'{EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}'.split())
             
                 
