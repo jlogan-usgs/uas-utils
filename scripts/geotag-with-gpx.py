@@ -12,23 +12,29 @@ example: runfile('geotag-with-gpx.py', args='-dir=D:/temp/testrename -f=2 -utc=0
 
 
 import argparse
-import sys
+
 from pathlib import Path
-import shutil
+
 from tqdm import tqdm
 from datetime import datetime, timedelta
 import exifread
 import numpy as np
 from lxml import etree
 import pandas as pd
-import utm
+import subprocess
 
-PYEXIFTOOLPATH = r'D:/jloganPython/pyexiftool'
-#append path with pyexiftool
-sys.path.append(PYEXIFTOOLPATH)
+
+#PYEXIFTOOLPATH = r'D:/jloganPython/pyexiftool'
+#EXIFTOOLPATH = r'D:/soft/exiftool-10.49/exiftool.exe'
+##append path with pyexiftool
+#sys.path.append(PYEXIFTOOLPATH)
+#import exiftool
+
+EXIFTOOLPATH = r'D:/soft/exiftool-10.49/exiftool.exe'
 
 gpxdirstr = 'T:/UAS/2018-676-FA/tlogs/yellow/aircraft/gpx'
-imgdirstr = 'D:/temp/testrename/jpg'
+imgdirstr = 'D:/temp/testrename'
+geotagcsv = 'geotag.csv'
 
 gpxdir = Path(gpxdirstr)
 imgdir = Path(imgdirstr)
@@ -61,15 +67,6 @@ def m_per_deg_lon(latdeg):
     m_at_lon = 111412.84 * np.cos(np.deg2rad(latdeg)) - 93.5 * np.cos(np.deg2rad(3.0 * latdeg)) + 0.118 * np.cos(np.deg2rad(5.0 * latdeg))
     return m_at_lon   
 
-
-#def getUTMs(row):
-#    '''Get UTM coords from lat,lon using utm library.
-#       from: https://stackoverflow.com/questions/30014684/pandas-apply-utm-function-to-dataframe-columns
-#    '''
-#    tup = utm.from_latlon(row['lat'], row['lon'])
-#    return pd.Series(tup[:2])
-
-
 def nearest(items, pivot):
     #from: https://stackoverflow.com/questions/32237862/find-the-closest-date-to-a-given-date
     return min(items, key=lambda x: abs(x - pivot))
@@ -78,7 +75,6 @@ def nearest_ind(items, pivot):
     #from: https://stackoverflow.com/questions/32237862/find-the-closest-date-to-a-given-date
     time_diff = np.abs([date - pivot for date in items])
     return time_diff.argmin(0)
-
 
 def mp_gpx_tag_to_pdseries(tree, namespace, tag):
     """
@@ -147,13 +143,13 @@ if any(i >= max_gps_err_per_sec_meters for i in [latdf.diff_m.abs().max(), londf
 gpx1hzdf = gpxdf.groupby('dt', as_index=False).mean()
 
 #instatiate new dataframe to hold image name, lat, long, etc
-geotagdf = pd.DataFrame(columns=['imagepath','imagename','imagedt', 'imagedt_adj','gpxtime','timediff','gpxlat','gpxlon','gpxele', 'gpxheading','gpxroll','gpxpitch'])
+geotagdf = pd.DataFrame(columns=['ImagePath','SourceFile','ImageDateTime', 'ImageDateTime_Adj','GPSTime','TimeDiff','GPSLatitude','GPSLongitude','GPSAltitude', 'GPSHeading','GPSRoll','GPSPitch'])
 
 #loop through ftypes
 for ftype in ftypes:
-#loop through files and write data to pandas df
+#loop through subdir and write data to pandas df
     #for fn in tqdm(imgdir.glob('*.' + ftype)):
-    for fn in imgdir.glob('*.' + ftype):
+    for fn in imgdir.glob('**/*.' + ftype):
         #Load image datetime from exif
         imgdt = datetime.strptime(get_dt_original(fn), '%Y:%m:%d %H:%M:%S')
         
@@ -163,46 +159,49 @@ for ftype in ftypes:
         #find nearest dt stamp in gpx1hzdf
         idx = nearest_ind(gpx1hzdf['dt'], adjimgdt)
         gpxtime = gpx1hzdf.loc[idx]['dt'].to_pydatetime()
-        gpxlat = gpx1hzdf.loc[idx]['lat']
-        gpxlon = gpx1hzdf.loc[idx]['lon']
-        gpxele = gpx1hzdf.loc[idx]['ele']
+#        gpxlat = gpx1hzdf.loc[idx]['lat']
+#        gpxlon = gpx1hzdf.loc[idx]['lon']
+#        gpxele = gpx1hzdf.loc[idx]['ele']
         #check if exceeds max time offset
         abs_actual_offset = np.abs((imgdt - gpxtime).total_seconds())
         if abs_actual_offset > max_time_offset:
             print(f'No GPS data found within {max_time_offset} seconds of adjusted image time for image {fn}, skipping geotag operation.')
             geotagdf = geotagdf.append({
-                    'imagepath': fn,
-                    'imagename': fn,
-                    'imagedt': imgdt,
-                    'imagedt_adj' : adjimgdt,
-                    'gpxtime': gpxtime,
-                    'timediff': abs_actual_offset,
-                    'gpxlat': np.NaN,
-                    'gpxlon': np.NaN,
-                    'gpxele': np.NaN,
-                    'gpxheading': np.NaN,
-                    'gpxroll': np.NaN,
-                    'gpxpitch': np.NaN,
+                    'ImagePath': fn,
+                    'SourceFile': fn,
+                    'ImageDateTime': imgdt,
+                    'ImageDateTime_Adj' : adjimgdt,
+                    'GPSTime': gpxtime,
+                    'TimeDiff': abs_actual_offset,
+                    'GPSLatitude': np.NaN,
+                    'GPSLongitude': np.NaN,
+                    'GPSAltitude': np.NaN,
+                    'GPSHeading': np.NaN,
+                    'GPSRoll': np.NaN,
+                    'GPSPitch': np.NaN,
                     }, ignore_index=True)
         else:
             geotagdf = geotagdf.append({
-                    'imagepath': fn,
-                    'imagename': fn,
-                    'imagedt': imgdt,
-                    'imagedt_adj' : adjimgdt,
-                    'gpxtime': gpxtime,
-                    'timediff': abs_actual_offset,
-                    'gpxlat': gpx1hzdf.loc[idx]['lat'],
-                    'gpxlon': gpx1hzdf.loc[idx]['lon'],
-                    'gpxele': gpx1hzdf.loc[idx]['ele'],
-                    'gpxheading': gpx1hzdf.loc[idx]['course'],
-                    'gpxroll': gpx1hzdf.loc[idx]['roll'],
-                    'gpxpitch': gpx1hzdf.loc[idx]['pitch'],
+                    'ImagePath': fn,
+                    'SourceFile': fn,
+                    'ImageDateTime': imgdt,
+                    'ImageDateTime_Adj' : adjimgdt,
+                    'GPSTime': gpxtime,
+                    'TimeDiff': abs_actual_offset,
+                    'GPSLatitude': gpx1hzdf.loc[idx]['lat'],
+                    'GPSLongitude': gpx1hzdf.loc[idx]['lon'],
+                    'GPSAltitude': gpx1hzdf.loc[idx]['ele'],
+                    'GPSHeading': gpx1hzdf.loc[idx]['course'],
+                    'GPSRoll': gpx1hzdf.loc[idx]['roll'],
+                    'GPSPitch': gpx1hzdf.loc[idx]['pitch'],
                     }, ignore_index=True)
 
-#Loop through df and run exiftool
+#Export to geotag csv
+geotagdf.to_csv(imgdir.joinpath('geotag.csv'), index=False)
+csvfnstr= imgdir.joinpath('geotag.csv').as_posix()
 
-    #using pyexiftool?
+#run exiftool using subprocess
+subprocess.run(f'{EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}'.split())
             
                 
             
