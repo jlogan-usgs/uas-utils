@@ -37,6 +37,8 @@ ftypes = ['JPG', 'DNG']  #file types to geotag
 max_gps_err_per_sec_meters = 25 #cutoff to determine if there are overlapping gpx files in gpx batch
 max_time_offset = 10 #max acceptable difference between GPX time and image time
 
+#log start time
+start = datetime.now()
 
 #Helper functions
 
@@ -248,10 +250,15 @@ csvfnstr = imgdir.joinpath(f'{str(imgdir.name)}_{geotagfn}.csv').as_posix()
 #run exiftool using subprocess
 print(f'running exiftool command: {EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}')
 subprocess.run(f'{EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}'.split())
+
+#log total time
+ts = datetime.now() - start
+
             
 #Give user command to undo
-print('Geotagging complete. Original files have been preserved.\n' +
-      'If you would like to undo the geotagging operation, issue the following command in a terminal window:\n')
+print(f'Geotagging completed in {str(ts)}.')
+print('Original files have been preserved.')
+print('If you would like to undo the geotagging operation, issue the following command in a terminal window:\n')
 print(f'         {EXIFTOOLPATH} -restore_original -r {imgdirstr}')           
             
     
