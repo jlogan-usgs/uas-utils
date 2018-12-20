@@ -2,14 +2,17 @@
 """
 Created on Wed Nov  7 13:42:23 2018
 
-Script to geotag UAS imagery with GPX file created from Mission Planner from data flash BIN file from 3DR Solo.
+Script to geotag UAS imagery with GPX files created from Mission Planner from 
+data flash BIN file from 3DR Solo.
+
+Since some gpx file have more than 1 position recorded for each second, and because 
+UAS camera only has 1 sec precision, all positions will be averaged for each second.
+Position assigned to image will be mean of all positions for the second during which 
+the image was acquired.
 
 example: runfile('geotag-with-gpx.py', args='-dir=D:/temp/testrename -f=2 -utc=0 -sepdir')
 @author: jlogan
 """
-
-#NOT FUNCTIONAL.
-
 
 import argparse
 from pathlib import Path
@@ -20,21 +23,22 @@ from lxml import etree
 import pandas as pd
 import subprocess
 
-
+#Path to your exiftool.exe
 EXIFTOOLPATH = r'D:/soft/exiftool-10.49/exiftool.exe'
 
+#Inputs (these will be used if not entered in command line)
 gpxdirstr = 'T:/UAS/2018-676-FA/tlogs/yellow/aircraft/gpx'
 imgdirstr = 'D:/temp/test_geotag'
-geotagfn = 'geotag'
+cam_to_utc_adjust_sec = 0 #Number of seconds (+-) to adjust camera time to get to accurate UTC time
 
-gpxdir = Path(gpxdirstr)
-imgdir = Path(imgdirstr)
-
+#Hard coded variables (change these if needed)
+geotagfn = 'geotag'  #suffix for naming output geotag csv file (prefix is imgdir)
 ftypes = ['JPG', 'DNG']  #file types to geotag
 max_gps_err_per_sec_meters = 25 #cutoff to determine if there are overlapping gpx files in gpx batch
 max_time_offset = 10 #max acceptable difference between GPX time and image time
 
-cam_to_utc_adjust_sec = 0 #Number of seconds (+-) to adjust camera time to get to accurate UTC time
+
+#Helper functions
 
 #using exifread which works for DNG and JPG
 def get_dt_original(fn):
@@ -96,6 +100,56 @@ def mp_gpx_to_df(gpxfile, namespace):
     
     return(gpxdf)
     
+
+# ===========================  BEGIN ARGUMENT PARSER ==============================
+descriptionstr = ('  Script to geotag directories of images using a collection of gpx files.')
+parser = argparse.ArgumentParser(description=descriptionstr, 
+                                 epilog='example: run geotag-with-gpx.py '
+                                         '-imgdir=D:/mydir/data/images '
+                                         '-gpxdir=D:/mydir/data/gpx '
+                                         '-imgoffset=5')
+#input gpx directory arg
+parser.add_argument('-gpxdir', '--gpx_directory', dest='gpxdir_arg',  
+                    required=False,
+                    help='input directory with gpx files')
+
+#input image directory arg
+parser.add_argument('-imgdir', '--image_directory', dest='imgdir_arg',  
+                    required=False,
+                    help='input directory with image files or directories of images')
+
+#utc offset arg
+parser.add_argument('-imgoffset', '--cam_to_utc_adjust_sec', dest='imgoffset_arg',  
+                    type=float, required=False,
+                    help='image time to utc adjustment in seconds')
+
+#parse
+args = parser.parse_args()
+# ===========================  END ARGUMENT PARSER ==============================
+
+#if arguments supplied via command line, use values to set inputs, otherwise use
+#inputs set in script above
+if args.gpxdir_arg is not None:
+    gpxdirstr = args.gpxdir_arg
+
+if args.imgdir_arg is not None:
+    imgdirstr = args.imgdir_arg
+
+if args.imgoffset_arg is not None:
+    cam_to_utc_adjust_sec = args.imgoffset_arg
+
+#Set path objects
+gpxdir = Path(gpxdirstr)
+imgdir = Path(imgdirstr)
+
+#check that paths exist
+for directory in [gpxdir, imgdir]:
+    try:
+        if not directory.exists():
+            raise Exception(f'{str(directory.absolute())} dir does not exist, stopping execution')
+    except:
+            raise Exception(f'{str(directory.absolute())} dir does not exist, stopping execution')
+
 #instatiate empty df to store all gpx data
 gpxdf = pd.DataFrame()
 
@@ -146,9 +200,7 @@ for ftype in ftypes:
         #find nearest dt stamp in gpx1hzdf
         idx = nearest_ind(gpx1hzdf['dt'], adjimgdt)
         gpxtime = gpx1hzdf.loc[idx]['dt'].to_pydatetime()
-#        gpxlat = gpx1hzdf.loc[idx]['lat']
-#        gpxlon = gpx1hzdf.loc[idx]['lon']
-#        gpxele = gpx1hzdf.loc[idx]['ele']
+
         #check if exceeds max time offset
         abs_actual_offset = np.abs((imgdt - gpxtime).total_seconds())
         if abs_actual_offset > max_time_offset:
@@ -183,6 +235,12 @@ for ftype in ftypes:
                     'GPSPitch': gpx1hzdf.loc[idx]['pitch'],
                     }, ignore_index=True)
 
+#Print to console
+print(f'GPX record: {str(gpxdf["dt"].min())} - {str(gpxdf["dt"].max())}')
+print(f'Image time record: {str(geotagdf["ImageDateTime"].min())} - {str(geotagdf["ImageDateTime"].max())}')
+print(f'Adjusted image time record (image time + {cam_to_utc_adjust_sec}): {str(geotagdf["ImageDateTime_Adj"].min())} - {str(geotagdf["ImageDateTime_Adj"].max())}')
+print(f'GPS positions found for {geotagdf["GPSLatitude"].notna().sum()} of {len(geotagdf)} images.')
+
 #Export to geotag csv 
 geotagdf.to_csv(imgdir.joinpath(f'{str(imgdir.name)}_{geotagfn}.csv'), index=False)
 csvfnstr = imgdir.joinpath(f'{str(imgdir.name)}_{geotagfn}.csv').as_posix()
@@ -191,6 +249,9 @@ csvfnstr = imgdir.joinpath(f'{str(imgdir.name)}_{geotagfn}.csv').as_posix()
 print(f'running exiftool command: {EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}')
 subprocess.run(f'{EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}'.split())
             
-                
+#Give user command to undo
+print('Geotagging complete. Original files have been preserved.\n' +
+      'If you would like to undo the geotagging operation, issue the following command in a terminal window:\n')
+print(f'         {EXIFTOOLPATH} -restore_original -r {imgdirstr}')           
             
     
