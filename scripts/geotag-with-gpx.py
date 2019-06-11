@@ -189,7 +189,7 @@ if any(i >= max_gps_err_per_sec_meters for i in [latdf.diff_m.abs().max(), londf
 gpx1hzdf = gpxdf.groupby('dt', as_index=False).mean()
 
 #instatiate new dataframe to hold image name, lat, long, etc
-geotagdf = pd.DataFrame(columns=['ImagePath','SourceFile','ImageDateTime', 'ImageDateTime_Adj','GPSTime','TimeDiff','GPSLatitude','GPSLongitude','GPSAltitude', 'GPSHeading','GPSRoll','GPSPitch'])
+geotagdf = pd.DataFrame(columns=['ImagePath','SourceFile','ImageDateTime', 'ImageDateTime_Adj','UTCTime','TimeDiff','GPSLatitude','GPSLongitude','GPSAltitude', 'GPSHeading','GPSRoll','GPSPitch'])
 
 #loop through ftypes
 for ftype in ftypes:
@@ -217,7 +217,7 @@ for ftype in ftypes:
                     'SourceFile': fn,
                     'ImageDateTime': imgdt,
                     'ImageDateTime_Adj' : adjimgdt,
-                    'GPSTime': gpxtime,
+                    'UTCTime': gpxtime,
                     'TimeDiff': abs_actual_offset,
                     'GPSLatitude': np.NaN,
                     'GPSLongitude': np.NaN,
@@ -232,7 +232,7 @@ for ftype in ftypes:
                     'SourceFile': fn,
                     'ImageDateTime': imgdt,
                     'ImageDateTime_Adj' : adjimgdt,
-                    'GPSTime': gpxtime,
+                    'UTCTime': gpxtime,
                     'TimeDiff': abs_actual_offset,
                     'GPSLatitude': gpx1hzdf.loc[idx]['lat'],
                     'GPSLongitude': gpx1hzdf.loc[idx]['lon'],
