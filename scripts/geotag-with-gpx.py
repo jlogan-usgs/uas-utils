@@ -253,8 +253,9 @@ geotagdf.to_csv(imgdir.joinpath(f'{str(imgdir.name)}_{geotagfn}.csv'), index=Fal
 csvfnstr = imgdir.joinpath(f'{str(imgdir.name)}_{geotagfn}.csv').as_posix()
 
 #run exiftool using subprocess
-print(f'running exiftool command: {EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}')
-subprocess.run(f'{EXIFTOOLPATH} -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}'.split())
+#add -P to keep original file modification date
+print(f'running exiftool command: {EXIFTOOLPATH} -P -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}')
+subprocess.run(f'{EXIFTOOLPATH} -P -csv={csvfnstr} -gpslatituderef=N -gpslongituderef=W -gpsaltituderef=above -gpstrackref=T -r {imgdirstr}'.split())
 
 #log total time
 ts = datetime.now() - start
