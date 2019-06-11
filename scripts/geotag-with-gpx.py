@@ -10,7 +10,9 @@ UAS camera only has 1 sec precision, all positions will be averaged for each sec
 Position assigned to image will be mean of all positions for the second during which 
 the image was acquired.
 
-example: runfile('geotag-with-gpx.py', args='-dir=D:/temp/testrename -f=2 -utc=0 -sepdir')
+example: runfile('geotag-with-gpx.py', args='-imgdir=D:/mydir/data/images 
+                                             -gpxdir=D:/mydir/data/gpx 
+                                             -imgoffset=5')
 @author: jlogan
 """
 
