@@ -24,6 +24,7 @@ import numpy as np
 from lxml import etree
 import pandas as pd
 import subprocess
+import pytz
 
 #Path to your exiftool.exe
 EXIFTOOLPATH = r'D:/soft/exiftool-10.49/exiftool.exe'
@@ -163,9 +164,9 @@ for fn in gpxdir.glob('*.gpx'):
     gpxdf = pd.concat([gpxdf, mp_gpx_to_df(str(fn.resolve()), 'http://www.topografix.com/GPX/1/1')])
     
 #convert datetime to pandas datetime dtype in UTC, drop orig time column.
-#UTC conversion happens automatically
-gpxdf['dt'] = pd.to_datetime(gpxdf['time'], format='%Y-%m-%dT%H:%M:%S')
-gpxdf.drop(columns=['time'])
+#UTC conversion needed (utc = true)
+gpxdf['dt'] = pd.to_datetime(gpxdf['time'], format='%Y-%m-%dT%H:%M:%S', utc=True)
+gpxdf.drop(columns=['time'], inplace=True)
 
 #ensure that duplicates are close together spatially, 
 #then calc mean lat/long/elev for each
@@ -200,13 +201,15 @@ for ftype in ftypes:
         
         #adjust image time
         adjimgdt = imgdt + timedelta(seconds=cam_to_utc_adjust_sec)
+        #after applying cam_to_utc_adjust, this should be in utc, so make tzone aware
+        adjimgdt = adjimgdt.replace(tzinfo=pytz.UTC)
                           
         #find nearest dt stamp in gpx1hzdf
         idx = nearest_ind(gpx1hzdf['dt'], adjimgdt)
         gpxtime = gpx1hzdf.loc[idx]['dt'].to_pydatetime()
 
         #check if exceeds max time offset
-        abs_actual_offset = np.abs((imgdt - gpxtime).total_seconds())
+        abs_actual_offset = np.abs((imgdt - gpxtime.replace(tzinfo=None)).total_seconds())
         if abs_actual_offset > max_time_offset:
             print(f'No GPS data found within {max_time_offset} seconds of adjusted image time for image {fn}, skipping geotag operation.')
             geotagdf = geotagdf.append({
