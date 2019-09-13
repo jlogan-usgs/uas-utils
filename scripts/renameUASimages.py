@@ -4,6 +4,7 @@ Created on Tue May  31 16:38:07 2018
 Script to rename imagery with flight prefix and UTC time/date from EXIF
 
 example: runfile('renameUASimages.py', args='-dir=D:/temp/testrename -f=2 -utc=0 -sepdir')
+example to skip user confirmation: runfile('renameUASimages.py', args='-dir=D:/temp/testrename -f=2 -utc=0 -sepdir -skipconf')
 @author: jlogan
 """
 import argparse
@@ -77,6 +78,11 @@ parser.add_argument('-utc', '--utc_offset', dest='utcoffset',
 #arg to separate files into raw and jpg dir
 parser.add_argument('-sepdir', '--sep_files_dir', help='separate raw and jpg into separate dir',
     action='store_true')
+#argument to skip user confirmation to continue
+parser.add_argument('-skipconf', '--skip_confirmation', dest='skipconf',  
+                    nargs='?', const=True, type=bool,
+                    help='skip user confirmation')
+
 #parse
 args = parser.parse_args()
 
@@ -85,6 +91,7 @@ fltnum = args.fltnum
 indir = Path(args.indir)
 sepdir = args.sep_files_dir
 utcoffset = args.utcoffset
+skipconf = args.skipconf
 
 #Show sample rename to user
 ftype = ftypes[0]
@@ -94,16 +101,23 @@ print('Image ' + fsample.name + ' has time stamp: ' +
       '\n' + 'Image ' + fsample.name + ' will be renamed to: ' + 
       new_image_name(fsample, utcoffset, fltnum)+ '\n')
 
-#Get confirmation to continue
-if user_prompt('Do you want to rename this and all images in this directory following this pattern?'):
-    #loop through ftypes
-    for ftype in ftypes:
-        #loop through files
-        for fn in tqdm(indir.glob('*.' + ftype)):
-            fn.rename(Path(fn.parent, Path(new_image_name(fn, utcoffset, fltnum))))
+if not skipconf:
+    #Get confirmation to continue
+    if user_prompt('Do you want to rename this and all images in this directory following this pattern?'):
+        #loop through ftypes
+        for ftype in ftypes:
+            #loop through files
+            for fn in tqdm(indir.glob('*.' + ftype)):
+                fn.rename(Path(fn.parent, Path(new_image_name(fn, utcoffset, fltnum))))
+    else:
+        print('Terminating script.')
+        sys.exit()
 else:
-    print('Terminating script.')
-    sys.exit()
+    #loop through ftypes
+        for ftype in ftypes:
+            #loop through files
+            for fn in tqdm(indir.glob('*.' + ftype)):
+                fn.rename(Path(fn.parent, Path(new_image_name(fn, utcoffset, fltnum))))
                 
             
 #move to separate directories if specified
